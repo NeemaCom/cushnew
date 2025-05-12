@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { loginUser } from "@/app/actions/auth"
 
 export default function LoginPage() {
@@ -23,8 +24,18 @@ export default function LoginPage() {
 
     try {
       // In a real app, this would call a server action to authenticate the user
-      await loginUser(formData)
-      router.push("/dashboard")
+      const result = await loginUser(formData)
+
+      if (result.success) {
+        if (result.requiresTwoFactor) {
+          // Redirect to 2FA verification page
+          router.push(`/two-factor?session=${result.sessionId}`)
+        } else {
+          router.push("/dashboard")
+        }
+      } else {
+        setError(result.message || "Invalid email or password")
+      }
     } catch (err) {
       setError("Invalid email or password")
       console.error(err)
@@ -82,7 +93,7 @@ export default function LoginPage() {
               </div>
             </div>
             <div className="flex items-center space-x-2">
-              <Checkbox id="remember" />
+              <Checkbox id="remember" name="remember" />
               <label
                 htmlFor="remember"
                 className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
@@ -90,7 +101,11 @@ export default function LoginPage() {
                 Remember me
               </label>
             </div>
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">
             <Button type="submit" className="w-full" disabled={isLoading}>

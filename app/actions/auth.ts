@@ -4,9 +4,28 @@
 // In a real application, you would use a proper authentication system
 
 import { cookies } from "next/headers"
+import {
+  generateSecret,
+  generateQrCodeUrl,
+  storeSecret,
+  getSecret,
+  verifyTOTP,
+  generateBackupCodes,
+  verifyBackupCode,
+  disable2FA,
+} from "@/app/lib/2fa"
 
 // Mock user database
 const users = new Map()
+
+// Mock email verification tokens
+const verificationTokens = new Map()
+
+// Mock password reset tokens
+const passwordResetTokens = new Map()
+
+// Mock 2FA pending sessions
+const pendingTwoFactorSessions = new Map()
 
 export async function createUser(formData: FormData) {
   // In a real app, you would:
@@ -21,15 +40,15 @@ export async function createUser(formData: FormData) {
   const country = formData.get("country") as string
 
   if (!name || !email || !password || !country) {
-    throw new Error("Missing required fields")
+    return { success: false, message: "Missing required fields" }
   }
 
   // Check if user already exists
   if (users.has(email)) {
-    throw new Error("User already exists")
+    return { success: false, message: "User already exists" }
   }
 
-  // Create user
+  // Create user (not verified yet)
   const user = {
     id: Date.now().toString(),
     name,
@@ -38,41 +57,214 @@ export async function createUser(formData: FormData) {
     // In a real app, you would hash the password
     password,
     createdAt: new Date(),
+    verified: false,
+    twoFactorEnabled: false,
   }
 
   // Store user
   users.set(email, user)
 
-  // Create session
-  await createSession(user.id)
+  // Generate verification token
+  const verificationToken = generateToken()
+  verificationTokens.set(verificationToken, {
+    email,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  })
 
-  return user
+  // In a real app, you would send an email with the verification link
+  console.log(`Verification link: /verify-email?token=${verificationToken}&email=${email}`)
+
+  return {
+    success: true,
+    message: "User created. Please check your email to verify your account.",
+  }
 }
 
 export async function loginUser(formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
+  const remember = formData.get("remember") === "on"
 
   if (!email || !password) {
-    throw new Error("Missing email or password")
+    return { success: false, message: "Missing email or password" }
   }
 
   // Check if user exists
   const user = users.get(email)
   if (!user) {
-    throw new Error("User not found")
+    return { success: false, message: "Invalid email or password" }
+  }
+
+  // Check if user is verified
+  if (!user.verified) {
+    return { success: false, message: "Please verify your email before logging in" }
   }
 
   // Check password
   // In a real app, you would compare hashed passwords
   if (user.password !== password) {
-    throw new Error("Invalid password")
+    return { success: false, message: "Invalid email or password" }
+  }
+
+  // Check if 2FA is enabled
+  if (user.twoFactorEnabled) {
+    // Create a pending 2FA session
+    const sessionId = generateToken()
+    pendingTwoFactorSessions.set(sessionId, {
+      userId: user.id,
+      email: user.email,
+      remember,
+      expires: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    })
+
+    return {
+      success: true,
+      requiresTwoFactor: true,
+      sessionId,
+    }
   }
 
   // Create session
-  await createSession(user.id)
+  const maxAge = remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7 // 30 days or 7 days
+  await createSession(user.id, maxAge)
 
-  return user
+  return { success: true }
+}
+
+export async function verifyTwoFactor(sessionId: string, code: string, useBackupCode = false) {
+  // Check if session exists
+  const session = pendingTwoFactorSessions.get(sessionId)
+  if (!session) {
+    return { success: false, message: "Invalid or expired session" }
+  }
+
+  // Check if session is expired
+  if (session.expires < new Date()) {
+    pendingTwoFactorSessions.delete(sessionId)
+    return { success: false, message: "Session has expired" }
+  }
+
+  // Get user
+  const user = Array.from(users.values()).find((u: any) => u.id === session.userId)
+  if (!user) {
+    return { success: false, message: "User not found" }
+  }
+
+  let isValid = false
+
+  if (useBackupCode) {
+    // Verify backup code
+    isValid = verifyBackupCode(user.id, code)
+  } else {
+    // Get 2FA secret
+    const secret = getSecret(user.id)
+    if (!secret) {
+      return { success: false, message: "2FA is not properly set up" }
+    }
+
+    // Verify TOTP code
+    isValid = verifyTOTP(secret, code)
+  }
+
+  if (!isValid) {
+    return { success: false, message: useBackupCode ? "Invalid backup code" : "Invalid verification code" }
+  }
+
+  // Delete pending session
+  pendingTwoFactorSessions.delete(sessionId)
+
+  // Create session
+  const maxAge = session.remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7 // 30 days or 7 days
+  await createSession(user.id, maxAge)
+
+  return { success: true }
+}
+
+export async function setup2FA(userId: string) {
+  // Get user
+  const user = Array.from(users.values()).find((u: any) => u.id === userId)
+  if (!user) {
+    return { success: false, message: "User not found" }
+  }
+
+  // Generate secret
+  const secret = generateSecret()
+
+  // Generate QR code URL
+  const qrCodeUrl = generateQrCodeUrl(user.email, secret)
+
+  // Store secret temporarily (will be confirmed later)
+  storeSecret(userId, secret)
+
+  return {
+    success: true,
+    secret,
+    qrCodeUrl,
+  }
+}
+
+export async function confirm2FA(userId: string, code: string) {
+  // Get user
+  const user = Array.from(users.values()).find((u: any) => u.id === userId)
+  if (!user) {
+    return { success: false, message: "User not found" }
+  }
+
+  // Get 2FA secret
+  const secret = getSecret(userId)
+  if (!secret) {
+    return { success: false, message: "2FA setup not initiated" }
+  }
+
+  // Verify TOTP code
+  const isValid = verifyTOTP(secret, code)
+  if (!isValid) {
+    return { success: false, message: "Invalid verification code" }
+  }
+
+  // Enable 2FA for user
+  user.twoFactorEnabled = true
+  users.set(user.email, user)
+
+  // Generate backup codes
+  const backupCodes = generateBackupCodes(userId)
+
+  return {
+    success: true,
+    backupCodes,
+  }
+}
+
+export async function disable2FAForUser(userId: string, code: string) {
+  // Get user
+  const user = Array.from(users.values()).find((u: any) => u.id === userId)
+  if (!user) {
+    return { success: false, message: "User not found" }
+  }
+
+  // Check if 2FA is enabled
+  if (!user.twoFactorEnabled) {
+    return { success: false, message: "2FA is not enabled" }
+  }
+
+  // Get 2FA secret
+  const secret = getSecret(userId)
+  if (!secret) {
+    return { success: false, message: "2FA is not properly set up" }
+  }
+
+  // Verify TOTP code
+  const isValid = verifyTOTP(secret, code)
+  if (!isValid) {
+    return { success: false, message: "Invalid verification code" }
+  }
+
+  // Disable 2FA
+  user.twoFactorEnabled = false
+  users.set(user.email, user)
+  disable2FA(userId)
+
+  return { success: true }
 }
 
 export async function logoutUser() {
@@ -80,7 +272,119 @@ export async function logoutUser() {
   cookies().delete("session")
 }
 
-async function createSession(userId: string) {
+export async function verifyEmail(token: string) {
+  // Check if token exists
+  const verification = verificationTokens.get(token)
+  if (!verification) {
+    return { success: false, message: "Invalid or expired verification token" }
+  }
+
+  // Check if token is expired
+  if (verification.expires < new Date()) {
+    verificationTokens.delete(token)
+    return { success: false, message: "Verification token has expired" }
+  }
+
+  // Get user
+  const user = users.get(verification.email)
+  if (!user) {
+    return { success: false, message: "User not found" }
+  }
+
+  // Mark user as verified
+  user.verified = true
+  users.set(verification.email, user)
+
+  // Delete token
+  verificationTokens.delete(token)
+
+  return { success: true }
+}
+
+export async function resendVerificationEmail(email: string) {
+  // Check if user exists
+  const user = users.get(email)
+  if (!user) {
+    return { success: false, message: "User not found" }
+  }
+
+  // Check if user is already verified
+  if (user.verified) {
+    return { success: false, message: "Email is already verified" }
+  }
+
+  // Delete any existing tokens for this email
+  for (const [token, verification] of verificationTokens.entries()) {
+    if (verification.email === email) {
+      verificationTokens.delete(token)
+    }
+  }
+
+  // Generate new verification token
+  const verificationToken = generateToken()
+  verificationTokens.set(verificationToken, {
+    email,
+    expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+  })
+
+  // In a real app, you would send an email with the verification link
+  console.log(`Verification link: /verify-email?token=${verificationToken}&email=${email}`)
+
+  return { success: true }
+}
+
+export async function requestPasswordReset(email: string) {
+  // Check if user exists
+  const user = users.get(email)
+  if (!user) {
+    // For security reasons, don't reveal that the user doesn't exist
+    return { success: true }
+  }
+
+  // Generate password reset token
+  const resetToken = generateToken()
+  passwordResetTokens.set(resetToken, {
+    email,
+    expires: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
+  })
+
+  // In a real app, you would send an email with the reset link
+  console.log(`Password reset link: /reset-password?token=${resetToken}`)
+
+  return { success: true }
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  // Check if token exists
+  const reset = passwordResetTokens.get(token)
+  if (!reset) {
+    return { success: false, message: "Invalid or expired reset token" }
+  }
+
+  // Check if token is expired
+  if (reset.expires < new Date()) {
+    passwordResetTokens.delete(token)
+    return { success: false, message: "Reset token has expired" }
+  }
+
+  // Get user
+  const user = users.get(reset.email)
+  if (!user) {
+    return { success: false, message: "User not found" }
+  }
+
+  // Update password
+  // In a real app, you would hash the password
+  user.password = newPassword
+  users.set(reset.email, user)
+
+  // Delete token
+  passwordResetTokens.delete(token)
+
+  return { success: true }
+}
+
+async function createSession(userId: string, maxAge: number = 60 * 60 * 24 * 7) {
   // In a real app, you would:
   // 1. Create a session token
   // 2. Store the session in a database
@@ -93,7 +397,7 @@ async function createSession(userId: string) {
     httpOnly: true,
     path: "/",
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 60 * 24 * 7, // 1 week
+    maxAge, // Default: 1 week
   })
 }
 
@@ -109,4 +413,17 @@ export async function getSession() {
   // 2. Fetch the user from the database
 
   return session.value
+}
+
+export async function getCurrentUser() {
+  const sessionId = await getSession()
+  if (!sessionId) return null
+
+  // Find user by ID
+  return Array.from(users.values()).find((user: any) => user.id === sessionId) || null
+}
+
+// Helper function to generate a random token
+function generateToken() {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 }
