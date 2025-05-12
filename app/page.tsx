@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowRight, Globe, Shield, CreditCard } from "lucide-react"
+import { ArrowRight, Globe, Shield, CreditCard, FileText, PiggyBank } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 export default function Home() {
@@ -15,8 +15,8 @@ export default function Home() {
             <Link href="#features" className="text-sm font-medium hover:underline underline-offset-4">
               Features
             </Link>
-            <Link href="#pricing" className="text-sm font-medium hover:underline underline-offset-4">
-              Pricing
+            <Link href="#services" className="text-sm font-medium hover:underline underline-offset-4">
+              Services
             </Link>
             <Link href="#about" className="text-sm font-medium hover:underline underline-offset-4">
               About
@@ -102,6 +102,62 @@ export default function Home() {
                 <p className="text-center text-gray-500">
                   Bank-level security with advanced encryption and fraud monitoring systems.
                 </p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="services" className="w-full py-12 md:py-24 lg:py-32">
+          <div className="container px-4 md:px-6">
+            <div className="flex flex-col items-center justify-center space-y-4 text-center mb-10">
+              <div className="space-y-2">
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-4xl">Our Comprehensive Services</h2>
+                <p className="max-w-[900px] text-gray-500 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+                  Financial solutions designed specifically for global citizens
+                </p>
+              </div>
+            </div>
+            <div className="mx-auto grid max-w-5xl grid-cols-1 gap-8 md:grid-cols-3 lg:gap-12">
+              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm">
+                <CreditCard className="h-12 w-12 text-primary" />
+                <h3 className="text-xl font-bold">Flexible Loans</h3>
+                <p className="text-center text-gray-500 mb-4">
+                  Access the funds you need with competitive rates and flexible repayment options designed for
+                  expatriates.
+                </p>
+                <Link href="/services/loans">
+                  <Button variant="outline" className="w-full">
+                    Explore Loans
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm">
+                <PiggyBank className="h-12 w-12 text-primary" />
+                <h3 className="text-xl font-bold">Smart Savings</h3>
+                <p className="text-center text-gray-500 mb-4">
+                  Grow your wealth with competitive interest rates and flexible savings options for international
+                  customers.
+                </p>
+                <Link href="/services/savings">
+                  <Button variant="outline" className="w-full">
+                    Explore Savings
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+              <div className="flex flex-col items-center space-y-4 rounded-lg border p-6 shadow-sm">
+                <FileText className="h-12 w-12 text-primary" />
+                <h3 className="text-xl font-bold">Documentation Services</h3>
+                <p className="text-center text-gray-500 mb-4">
+                  Secure, reliable document verification and certification services for your international needs.
+                </p>
+                <Link href="/services/documentation">
+                  <Button variant="outline" className="w-full">
+                    Explore Documentation
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
               </div>
             </div>
           </div>
