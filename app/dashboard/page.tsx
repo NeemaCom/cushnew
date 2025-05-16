@@ -17,6 +17,10 @@ import {
   Plus,
   Search,
   DollarSign,
+  Users,
+  BookOpen,
+  Briefcase,
+  MessageSquare,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -58,6 +62,10 @@ export default function DashboardPage() {
               <ArrowLeftRight className="h-4 w-4" />
               Transfers
             </Button>
+            <Button variant="ghost" className="justify-start gap-2" onClick={() => setActiveTab("community")}>
+              <Users className="h-4 w-4" />
+              Community
+            </Button>
             <Button variant="ghost" className="justify-start gap-2" onClick={() => setActiveTab("profile")}>
               <User className="h-4 w-4" />
               Profile
@@ -82,6 +90,7 @@ export default function DashboardPage() {
                 <TabsTrigger value="overview">Overview</TabsTrigger>
                 <TabsTrigger value="accounts">Accounts</TabsTrigger>
                 <TabsTrigger value="transfers">Transfers</TabsTrigger>
+                <TabsTrigger value="community">Community</TabsTrigger>
                 <TabsTrigger value="profile">Profile</TabsTrigger>
                 <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
@@ -279,6 +288,89 @@ export default function DashboardPage() {
                   </Button>
                 </CardFooter>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="community" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold">Community & Resources</h2>
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                <Card className="col-span-full md:col-span-2">
+                  <CardHeader>
+                    <CardTitle>Welcome to the CushPay Community</CardTitle>
+                    <CardDescription>
+                      Connect with others, find resources, and get support for your global journey
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      Our community hub is designed to help you navigate life across borders. Explore articles, find job
+                      opportunities, connect with mentors, and get answers to your questions about visas, housing,
+                      banking, and more.
+                    </p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <Button
+                        variant="outline"
+                        className="flex flex-col h-auto py-4 gap-2"
+                        onClick={() => (window.location.href = "/community/insights")}
+                      >
+                        <BookOpen className="h-6 w-6" />
+                        <span>Insights</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex flex-col h-auto py-4 gap-2"
+                        onClick={() => (window.location.href = "/community/jobs")}
+                      >
+                        <Briefcase className="h-6 w-6" />
+                        <span>Jobs Board</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex flex-col h-auto py-4 gap-2"
+                        onClick={() => (window.location.href = "/community/mentors")}
+                      >
+                        <Users className="h-6 w-6" />
+                        <span>Mentors</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="flex flex-col h-auto py-4 gap-2"
+                        onClick={() => (window.location.href = "/community/support")}
+                      >
+                        <MessageSquare className="h-6 w-6" />
+                        <span>AI Support</span>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium">Latest Articles</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      <div className="border-b pb-2">
+                        <h3 className="font-medium text-sm">Banking Across Borders: A Guide</h3>
+                        <p className="text-xs text-muted-foreground">3 days ago</p>
+                      </div>
+                      <div className="border-b pb-2">
+                        <h3 className="font-medium text-sm">Visa Updates for Remote Workers</h3>
+                        <p className="text-xs text-muted-foreground">1 week ago</p>
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-sm">Finding Housing in a New Country</h3>
+                        <p className="text-xs text-muted-foreground">2 weeks ago</p>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="sm" className="w-full mt-4">
+                      View All Articles
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             <TabsContent value="profile" className="space-y-6">

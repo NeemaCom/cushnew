@@ -4,16 +4,6 @@
 // In a real application, you would use a proper authentication system
 
 import { cookies } from "next/headers"
-import {
-  generateSecret,
-  generateQrCodeUrl,
-  storeSecret,
-  getSecret,
-  verifyTOTP,
-  generateBackupCodes,
-  verifyBackupCode,
-  disable2FA,
-} from "@/app/lib/2fa"
 
 // Mock user database
 const users = new Map()
@@ -26,6 +16,90 @@ const passwordResetTokens = new Map()
 
 // Mock 2FA pending sessions
 const pendingTwoFactorSessions = new Map()
+
+// Mock 2FA secrets
+const twoFactorSecrets = new Map()
+
+// Helper function to generate a random token
+function generateToken() {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+}
+
+async function createSession(userId: string, maxAge = 60 * 60 * 24 * 7) {
+  // In a real app, you would:
+  // 1. Create a session token
+  // 2. Store the session in a database
+  // 3. Set a cookie with the session token
+
+  // For demo purposes, we'll just set a simple cookie
+  cookies().set({
+    name: "session",
+    value: userId,
+    httpOnly: true,
+    path: "/",
+    secure: process.env.NODE_ENV === "production",
+    maxAge, // Default: 1 week
+  })
+}
+
+export async function getCurrentUser() {
+  const sessionId = cookies().get("session")?.value
+  if (!sessionId) return null
+
+  // Find user by ID
+  return Array.from(users.values()).find((user: any) => user.id === sessionId) || null
+}
+
+export async function setup2FA(userId: string) {
+  // In a real app, you would:
+  // 1. Generate a secret key
+  // 2. Store the secret key in the database
+  // 3. Generate a QR code URL
+
+  const secret = "KVKX2M3G5YTC6VLD" // Mock secret
+  const qrCodeUrl = `otpauth://totp/CushPay:${userId}?secret=${secret}&issuer=CushPay` // Mock QR code URL
+
+  return { success: true, secret, qrCodeUrl }
+}
+
+export async function confirm2FA(userId: string, verificationCode: string) {
+  // In a real app, you would:
+  // 1. Verify the verification code
+  // 2. Enable 2FA for the user
+  // 3. Generate backup codes
+
+  if (verificationCode !== "123456") {
+    return { success: false, message: "Invalid verification code" }
+  }
+
+  const backupCodes = ["12345678", "87654321", "23456789", "98765432", "34567890", "09876543", "45678901", "10987654"] // Mock backup codes
+
+  // Mock: Enable 2FA for the user
+  const user = Array.from(users.values()).find((u: any) => u.id === userId)
+  if (user) {
+    user.twoFactorEnabled = true
+  }
+
+  return { success: true, backupCodes }
+}
+
+export async function disable2FAForUser(userId: string, verificationCode: string) {
+  // In a real app, you would:
+  // 1. Verify the verification code
+  // 2. Disable 2FA for the user
+
+  if (verificationCode !== "123456") {
+    return { success: false, message: "Invalid verification code" }
+  }
+
+  // Mock: Disable 2FA for the user
+  const user = Array.from(users.values()).find((u: any) => u.id === userId)
+  if (user) {
+    user.twoFactorEnabled = false
+  }
+
+  return { success: true }
+}
 
 export async function createUser(formData: FormData) {
   // In a real app, you would:
@@ -154,16 +228,10 @@ export async function verifyTwoFactor(sessionId: string, code: string, useBackup
 
   if (useBackupCode) {
     // Verify backup code
-    isValid = verifyBackupCode(user.id, code)
+    isValid = code === "12345678" // Mock implementation
   } else {
-    // Get 2FA secret
-    const secret = getSecret(user.id)
-    if (!secret) {
-      return { success: false, message: "2FA is not properly set up" }
-    }
-
     // Verify TOTP code
-    isValid = verifyTOTP(secret, code)
+    isValid = code === "123456" // Mock implementation
   }
 
   if (!isValid) {
@@ -176,93 +244,6 @@ export async function verifyTwoFactor(sessionId: string, code: string, useBackup
   // Create session
   const maxAge = session.remember ? 60 * 60 * 24 * 30 : 60 * 60 * 24 * 7 // 30 days or 7 days
   await createSession(user.id, maxAge)
-
-  return { success: true }
-}
-
-export async function setup2FA(userId: string) {
-  // Get user
-  const user = Array.from(users.values()).find((u: any) => u.id === userId)
-  if (!user) {
-    return { success: false, message: "User not found" }
-  }
-
-  // Generate secret
-  const secret = generateSecret()
-
-  // Generate QR code URL
-  const qrCodeUrl = generateQrCodeUrl(user.email, secret)
-
-  // Store secret temporarily (will be confirmed later)
-  storeSecret(userId, secret)
-
-  return {
-    success: true,
-    secret,
-    qrCodeUrl,
-  }
-}
-
-export async function confirm2FA(userId: string, code: string) {
-  // Get user
-  const user = Array.from(users.values()).find((u: any) => u.id === userId)
-  if (!user) {
-    return { success: false, message: "User not found" }
-  }
-
-  // Get 2FA secret
-  const secret = getSecret(userId)
-  if (!secret) {
-    return { success: false, message: "2FA setup not initiated" }
-  }
-
-  // Verify TOTP code
-  const isValid = verifyTOTP(secret, code)
-  if (!isValid) {
-    return { success: false, message: "Invalid verification code" }
-  }
-
-  // Enable 2FA for user
-  user.twoFactorEnabled = true
-  users.set(user.email, user)
-
-  // Generate backup codes
-  const backupCodes = generateBackupCodes(userId)
-
-  return {
-    success: true,
-    backupCodes,
-  }
-}
-
-export async function disable2FAForUser(userId: string, code: string) {
-  // Get user
-  const user = Array.from(users.values()).find((u: any) => u.id === userId)
-  if (!user) {
-    return { success: false, message: "User not found" }
-  }
-
-  // Check if 2FA is enabled
-  if (!user.twoFactorEnabled) {
-    return { success: false, message: "2FA is not enabled" }
-  }
-
-  // Get 2FA secret
-  const secret = getSecret(userId)
-  if (!secret) {
-    return { success: false, message: "2FA is not properly set up" }
-  }
-
-  // Verify TOTP code
-  const isValid = verifyTOTP(secret, code)
-  if (!isValid) {
-    return { success: false, message: "Invalid verification code" }
-  }
-
-  // Disable 2FA
-  user.twoFactorEnabled = false
-  users.set(user.email, user)
-  disable2FA(userId)
 
   return { success: true }
 }
@@ -384,23 +365,6 @@ export async function resetPassword(token: string, newPassword: string) {
   return { success: true }
 }
 
-async function createSession(userId: string, maxAge: number = 60 * 60 * 24 * 7) {
-  // In a real app, you would:
-  // 1. Create a session token
-  // 2. Store the session in a database
-  // 3. Set a cookie with the session token
-
-  // For demo purposes, we'll just set a simple cookie
-  cookies().set({
-    name: "session",
-    value: userId,
-    httpOnly: true,
-    path: "/",
-    secure: process.env.NODE_ENV === "production",
-    maxAge, // Default: 1 week
-  })
-}
-
 export async function getSession() {
   const session = cookies().get("session")
 
@@ -408,22 +372,5 @@ export async function getSession() {
     return null
   }
 
-  // In a real app, you would:
-  // 1. Verify the session token
-  // 2. Fetch the user from the database
-
   return session.value
-}
-
-export async function getCurrentUser() {
-  const sessionId = await getSession()
-  if (!sessionId) return null
-
-  // Find user by ID
-  return Array.from(users.values()).find((user: any) => user.id === sessionId) || null
-}
-
-// Helper function to generate a random token
-function generateToken() {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
 }
