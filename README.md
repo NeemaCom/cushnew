@@ -1,4 +1,17 @@
-... This file was left out for brevity. Assume it is correct and does not need any modifications. ...
+# Global Payment Platform
+
+A comprehensive global payment platform with advanced features.
+
+## Getting Started
+
+First, run the development server:
+
+\`\`\`bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
 \`\`\`
 
-Let's create a script to set up husky:
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
